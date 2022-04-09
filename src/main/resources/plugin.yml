@@ -1,0 +1,15 @@
+name: JFixLectern
+version: '${project.version}'
+main: com.jigsawmc.jfixlectern.JFixLectern
+api-version: 1.14
+authors: [ Eghbal ]
+softdepend:
+  - PlaceholderAPI
+permissions:
+  jfl.alarm:
+    description:  get alarm
+  jfl.cmd:
+    description: bypass command
+commands:
+  jfixlectern:
+    permission: jfl.reload

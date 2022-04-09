@@ -1,0 +1,3 @@
+message: "&cPlayer &e{player} &cTrying to crash server"
+command: "kick {player} &e&lTrying To Crash Server"
+#
