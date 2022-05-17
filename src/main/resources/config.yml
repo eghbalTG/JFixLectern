@@ -1,3 +1,7 @@
-message: "&cPlayer &e{player} &cTrying to crash server"
-command: "kick {player} &e&lTrying To Crash Server"
-#
+# The player who is crashing the server
+message: "&e{player} &cis trying to crash the server"
+
+# Multiple commands could be used
+commands:
+  - "kick {player} &e&lTrying to crash the server"
+#  - "ban {player} &e&lTrying to crash the server"

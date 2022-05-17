@@ -1,11 +1,9 @@
 package com.jigsawmc.jfixlectern;
 
+import com.google.common.collect.Lists;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
+import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -15,91 +13,93 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-public final class JFixLectern extends JavaPlugin implements Listener , CommandExecutor, TabCompleter {
-    public boolean papi = false;
-    public String msg = "&cPlayer &e{player} &cTrying to crash server";
-    public String cmd = "kick {player} &cTrying to crash server";
+public final class JFixLectern extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
+    private final Pattern pattern = Pattern.compile("\\d+.\\d+");
+
     @Override
-    public void onEnable(){
-        String vers = getServer().getBukkitVersion();
-        double sversion = Double.parseDouble(vers.split("\\.")[0]+"."+vers.split("\\.")[1]);
-        if(sversion<1.14){
-            getLogger().warning(Rang("&e[FixLectern] Version less than 1.14 does not require this plugin !"));
-        }else{
-            getServer().getPluginManager().registerEvents(this,this);
-            Objects.requireNonNull(getCommand("jfixlectern")).setExecutor(this);
-            reloadplugin();
+    public void onEnable() {
+        this.saveDefaultConfig();
+        final long time = System.currentTimeMillis();
+
+        this.getLogger().info(Color("&bLoading JFixLectern &fVersion: &7" + getDescription().getVersion()));
+        if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            this.getLogger().info(Color("&aHooked into &bPlaceholderAPI"));
         }
+
+        this.getServer().getPluginManager().registerEvents(this, this);
+        final PluginCommand command = this.getCommand("jfixlectern");
+        if (command == null) {
+            this.getLogger().severe("The plugin.yml is missing!");
+            this.getPluginLoader().disablePlugin(this);
+            return;
+        }
+        command.setExecutor(this);
+        this.getLogger().info(Color(String.format("&aJFixLectern Loaded in &b%dms", System.currentTimeMillis() - time)));
     }
+
+
+    @Override
+    public void onLoad() {
+        final Matcher matcher = pattern.matcher(this.getServer().getBukkitVersion());
+        if (!matcher.find()) {
+            this.getLogger().severe(Color("The server version has not been found!"));
+            this.getPluginLoader().disablePlugin(this);
+            return;
+        }
+        if (Double.parseDouble(matcher.group()) >= 1.14) return;
+        this.getLogger().warning(Color("The server version is lower than 1.14, the plugin is not required!"));
+        this.getPluginLoader().disablePlugin(this);
+    }
+
     @Override
     public void onDisable() {
-        consolemsg("&cJFixLectern plugin unloaded. &eGood Bye");
+        this.getLogger().info(Color("&cJFixLectern plugin unloaded."));
     }
+
     @EventHandler(priority = EventPriority.LOWEST)
-    public void InventoryClickEvent(InventoryClickEvent e){
-        if(e.getInventory().getType().equals(InventoryType.LECTERN)){
-            e.setCancelled(true);
-            try {
-                Player p = (Player) e.getWhoClicked();
-                String txt = Rang(msg).replace("{player}",p.getName());
-                String command = Rang(cmd).replace("{player}",p.getName());
-                if(papi){
-                    txt = PlaceholderAPI.setPlaceholders(p,txt);
-                    command = PlaceholderAPI.setPlaceholders(p,command);
-                }
-                getLogger().warning(txt);
-                if(!p.hasPermission("jfl.cmd")) getServer().dispatchCommand(getServer().getConsoleSender(),command) ;
-                for(Player P : getServer().getOnlinePlayers()){
-                    if(P.hasPermission("jfl.alarm")){
-                        P.sendMessage(txt);
-                    }
-                }
-            }catch (Exception ex){
-                String ltxt = Rang(msg).replace("{player}",e.getWhoClicked().getName());
-                getLogger().warning(ltxt);
-            }
+    public void inventoryClickEvent(InventoryClickEvent event) {
+        if (!event.getInventory().getType().equals(InventoryType.LECTERN)) return;
+        event.setCancelled(true);
+        final Player p = (Player) event.getWhoClicked();
+
+        String message = Color(this.getConfig().getString("message", "kick {player} &e&lTrying to crash the server"))
+                .replace("{player}", p.getName());
+
+        List<String> commands = this.getConfig().getStringList("commands");
+
+        if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            message = PlaceholderAPI.setPlaceholders(p, message);
+            commands = PlaceholderAPI.setPlaceholders(p, commands);
         }
+
+        this.getLogger().warning(message);
+        this.getServer().broadcast(message, "jfl.alarm");
+
+        if (p.hasPermission("jfl.cmd")) return;
+        commands.forEach(command -> this.getServer().dispatchCommand(this.getServer().getConsoleSender(),
+                Color(command).replace("{player}", p.getName())));
     }
+
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if(label.equalsIgnoreCase("jfixlectern") && sender.hasPermission("jfp.reload")){
-            long time = System.currentTimeMillis();
-            sender.sendMessage(Rang("&e[JFixLectern] Reloading ..."));
-            reloadplugin();
-            sender.sendMessage(Rang("&a[JFixLectern] Reloaded on &b"+(System.currentTimeMillis()-time)+" ms"));
-        }
-        return false;
+        final long time = System.currentTimeMillis();
+        sender.sendMessage(Color("&e[JFixLectern] Reloading..."));
+        this.onEnable();
+        sender.sendMessage(Color(String.format("&a[JFixLectern] Reloaded in &b%dms", System.currentTimeMillis() - time)));
+        return true;
     }
+
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
-        List<String> list = new ArrayList<>();
-        if(sender.hasPermission("jfl.reload")) list.add("reload");
-        return list;
+        if (!sender.hasPermission("jfl.reload")) return null;
+        return Lists.newArrayList("reload");
     }
-    public void reloadplugin(){
-        long time = System.currentTimeMillis();
-        consolemsg("[JFL] &bLoading JFixLectern &fVersion: &7"+getDescription().getVersion());
-        saveDefaultConfig();
-        try {
-            msg = getConfig().getString("message");
-            cmd = getConfig().getString("command");
-        } catch (Exception ex){
-            consolemsg("&e[JFL] &cError loading config.ym !");
-        }
-        if(getServer().getPluginManager().getPlugin("PlaceholderAPI") != null){
-            papi=true;
-            consolemsg("&e[+] &aHook To &bPlaceholderAPI");
-        }
-        consolemsg("[JFL] &aJFixLectern Loaded on &b"+(System.currentTimeMillis()-time)+" &ems");
-    }
-    public void consolemsg(String txt){
-        getServer().getConsoleSender().sendMessage(Rang(txt));
-    }
-    public String Rang(String txt){
-        return ChatColor.translateAlternateColorCodes('&',txt);
+
+    public String Color(String string) {
+        return ChatColor.translateAlternateColorCodes('&', string);
     }
 }
